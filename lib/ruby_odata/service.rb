@@ -277,6 +277,7 @@ class Service
     entity_types.each do |e|
       next if e['Abstract'] == "true"
       klass_name = qualify_class_name(e['Name'])
+      next unless mapping_required?(klass_name)
       methods = collect_properties(klass_name, e, @edmx)
       nav_props = collect_navigation_properties(klass_name, e, @edmx)
       @classes[klass_name] = ClassBuilder.new(klass_name, methods, nav_props, self, @namespace).build unless @classes.keys.include?(klass_name)
@@ -286,6 +287,7 @@ class Service
     collections = @edmx.xpath("//edm:EntityContainer/edm:EntitySet", @ds_namespaces)
     collections.each do |c|
       entity_type = c["EntityType"]
+      next unless mapping_required?(qualify_class_name(entity_type.split('.').last))
       @collections[c["Name"]] = { :edmx_type => entity_type, :type => convert_to_local_type(entity_type) }
     end
 
@@ -479,7 +481,7 @@ class Service
         inline_klass = build_inline_class(klass, inline_entry, property_name)
         klass.send "#{property_name}=", inline_klass
       else
-        inline_classes, inline_entries = [], link.xpath("./m:inline/atom:feed/atom:entry", @ds_namespaces)
+        inline_classes, inline_entries = [], link.xpath(".//atom:entry", @ds_namespaces)
         for inline_entry in inline_entries
           # Build the class
           inline_klass = entry_to_class(inline_entry)
@@ -495,6 +497,10 @@ class Service
     end
 
     klass
+  end
+
+  def mapping_required? entity_name
+    @options[:to_map_entities].blank? ? (! entity_name.eql?('Service')) : @options[:to_map_entities].include?(entity_name)
   end
 
   # Tests for and extracts the next href of a partial
